@@ -1,0 +1,26 @@
+<?xml version="1.0" standalone="no"?>
+<stack:stack>
+
+<stack:description>
+Packages from Saltstack.org and dependencies
+</stack:description>
+
+<stack:copyright>
+Copyright (c) 2006 - 2017 Teradata
+All rights reserved. Stacki(r) v5.x stacki.com
+https://github.com/Teradata/stacki/blob/master/LICENSE.txt
+</stack:copyright>
+
+	<!-- Salt from Saltstack.org and dependencies -->
+
+<stack:package>stacki-salt</stack:package>
+
+<!-- Turn on the Salt Minion -->
+<stack:script stack:stage="install-post">
+mkdir -p /etc/salt/pki/minion
+systemctl enable salt-minion
+
+ln -s /opt/stack/bin/salt-minion /usr/bin/salt-minion
+</stack:script>
+
+</stack:stack>

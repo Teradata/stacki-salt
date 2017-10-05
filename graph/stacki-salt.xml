@@ -1,0 +1,31 @@
+<?xml version="1.0" standalone="no"?>
+
+<graph>
+
+	<description>
+
+	The stacki-salt Pallet
+
+	</description>
+
+	<copyright>
+	Copyright (c) 2006 - 2017 Teradata
+	All rights reserved. Stacki(r) v5.x stacki.com
+	https://github.com/Teradata/stacki/blob/master/LICENSE.txt
+	</copyright>
+
+
+	<edge from="base" to="stacki-salt-base" />
+	<edge from="server" to="stacki-salt-server" />
+	<edge from="client" to="stacki-salt-client" />
+
+	<!-- Add ordering of edges here. This defines
+	     the order in which the node XML files
+	     are run -->
+	<!--
+	     For example, to run the post section in stacki-salt-base
+	     after the resolv.xml from the stacki pallet, use the
+	     following directive
+	     <order head="resolv" tail="stacki-salt-base" />
+	-->
+</graph>

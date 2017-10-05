@@ -1,0 +1,214 @@
+<stack:stack>
+
+<stack:description>
+Salt config for servers
+</stack:description>
+
+<stack:copyright>
+Copyright (c) 2006 - 2017 Teradata
+All rights reserved. Stacki(r) v5.x stacki.com
+https://github.com/Teradata/stacki/blob/master/LICENSE.txt
+</stack:copyright>
+
+<stack:package>stacki-salt-command</stack:package>
+
+<!-- needed for brownfield discovery -->
+<stack:script stack:stage="install-post">
+
+/opt/stack/bin/stack set attr attr=salt.master.interface         value=&Kickstart_PrivateAddress;
+/opt/stack/bin/stack set attr attr=salt.master.log_level         value=info
+/opt/stack/bin/stack set attr attr=salt.master.log_level_logstack value=warning
+/opt/stack/bin/stack set attr attr=salt.master                   value=false
+/opt/stack/bin/stack set attr attr=salt.minion                   value=true
+
+/opt/stack/bin/stack set attr attr=salt.minion.master            value=&Kickstart_PrivateAddress;
+/opt/stack/bin/stack set attr attr=salt.minion.log_level         value=info
+/opt/stack/bin/stack set attr attr=salt.minion.log_level_logstack value=warning
+/opt/stack/bin/stack set attr attr=salt.minion.startup_states    value=highstate
+
+/opt/stack/bin/stack set host attr &hostname; attr=salt.master   value=true
+/opt/stack/bin/stack set host attr &hostname; attr=salt.minion.disable_modules \
+	value="[ cmd, test ]"
+
+
+mkdir -p /etc/salt/pki/master
+mkdir -p /etc/salt/master.d
+cd /etc/salt
+git init
+
+/opt/stack/bin/stack report host salt &hostname; | \
+	/opt/stack/bin/stack report script | sh
+
+git add master 
+git add minion
+
+<stack:file name="/etc/salt/master.d/acl.conf" mode="0640" rcs="false">
+client_acl: 
+  apache:
+    - stack-*
+    - mcli.*
+    - storagemonitor.*
+</stack:file>
+git add master.d/acl.conf
+
+<stack:file name="/etc/salt/master.d/roots.conf" mode="0640" rcs="false">
+stack:file_roots: 
+  base:
+    - /srv/salt
+  compiled:
+    - /export/stack/salt/compiled
+</stack:file>
+git add master.d/roots.conf
+
+<!-- Change Permissions on the salt master,
+     and jobs directories to allow read/exec
+     from apache -->
+mkdir -p /var/cache/salt/master
+mkdir -p /var/cache/salt/master/jobs
+mkdir -p /var/run/salt/master
+
+chmod og+rx /var/cache/salt
+chmod og+rx /var/cache/salt/master
+chmod og+rx /var/cache/salt/master/jobs
+chmod og+rx /var/run/salt/
+chmod og+rx /var/run/salt/master
+
+<!-- Turn on salt-master -->
+ln -s /opt/stack/bin/salt-minion /usr/bin/salt-minion
+
+systemctl enable salt-master.service
+systemctl start salt-master.service
+
+<!-- /etc/salt/pki/{master|minion}
+
+     Create the Master and Minion keys for Salt
+     Register Minion public key with Master
+     Register Master public key with Minion
+-->
+
+mkdir -p /etc/salt/pki/master/minions
+mkdir -p /etc/salt/pki/minion
+
+/opt/stack/bin/salt-key --gen-keys=master --gen-keys-dir=/etc/salt/pki/master
+git add pki/master/master.pem  
+git add pki/master/master.pub 
+
+/opt/stack/bin/salt-key --gen-keys=minion --gen-keys-dir=/etc/salt/pki/minion
+git add pki/minion/minion.pem   
+git add pki/minion/minion.pub 
+ 
+cp /etc/salt/pki/minion/minion.pub /etc/salt/pki/master/minions/&hostname;
+git add pki/master/minions/&hostname;
+
+cp /etc/salt/pki/master/master.pub /etc/salt/pki/minion/minion_master.pub 
+git add pki/minion/minion_master.pub 
+
+<!-- /etc/salt/pki/cluster
+
+     Place a copy of the master.pub and minion.{pem|pub} keys into
+     a directory that is readable by Apache.  This will allow us to
+     pick up the keys during Kickstart.  All Minions get the same
+     keys.
+-->
+
+mkdir -p /etc/salt/pki/cluster
+
+install -m0444 -g apache /etc/salt/pki/master/master.pub /etc/salt/pki/cluster/
+install -m0444 -g apache /etc/salt/pki/minion/minion.pub /etc/salt/pki/cluster/
+install -m0444 -g apache /etc/salt/pki/minion/minion.pem /etc/salt/pki/cluster/
+git add pki/cluster
+
+git commit -m "defaults"
+
+<!-- /etc/salt/pki/master/ssh
+
+     Place a copy of the root id_rsa and id_rsa.pub key in
+     master/ssh for the use of salt-ssh and brownfield
+     discovery support.
+     If ssh keys for the backend brownfield are different
+     than the root ssh keys, the user needs to add those
+     to this directory instead.
+-->
+mkdir -p /etc/salt/pki/master/ssh
+cp /root/.ssh/id_rsa /etc/salt/pki/master/ssh/salt-ssh.rsa
+cp /root/.ssh/id_rsa /etc/salt/pki/master/ssh/salt-ssh.rsa.pub
+git add pki/master/ssh
+git commit -m defaults
+
+<!-- Setup the Salt State areas -->
+
+mkdir -p /srv/salt/stack
+mkdir -p /srv/salt/site
+mkdir -p /srv/pillar/stack
+mkdir -p /srv/pillar/site
+mkdir -p /export/stack/salt/compiled
+
+<!-- Create a Git Repo in the salt states directories -->
+cd /export/stack/salt
+git init
+git commit -m "defaults"
+
+cd /srv 
+git init 
+
+<!-- Setup default top.sls stack:file to refer to stack states
+     and site-specific states. -->
+<stack:file name="/srv/salt/top.sls" mode="0640" rcs="false">
+base:
+
+  '*':
+    - stack
+    - site
+
+  'sync.hosts:true':
+    - match: pillar
+    - stack.hosts
+
+</stack:file>
+git add salt/top.sls
+
+<stack:file name="/srv/salt/site/init.sls" mode="0640" rcs="false"/>
+git add salt/site/init.sls 
+
+<stack:file name="/srv/salt/stack/init.sls" mode="0640" rcs="false"/>
+git add salt/stack/init.sls
+
+<!-- Create a default hosts sls stack:file to distribute /etc/hosts stack:file -->
+<stack:file name="/srv/salt/stack/hosts.sls" mode="0640" rcs="false">
+/etc/hosts:
+  stack:file.managed:
+    - source: salt://stack/hosts
+    - user: root
+    - group: root
+    - mode: 644
+</stack:file>
+git add salt/stack/hosts.sls
+
+<!-- Create link to /etc/hosts from within the salt states directory -->
+ln -s /etc/hosts /srv/salt/stack/hosts
+
+<!-- Create default pillar config stack:file -->
+<stack:file name="/srv/pillar/top.sls" mode="0640" rcs="false"> 
+base:
+
+  '*':
+    - stack
+    - stack.{{ grains['id'] }}
+    - site
+</stack:file>
+git add pillar/top.sls
+
+<stack:file name="/srv/pillar/site/init.sls" mode="0640" rcs="false"/>
+git add pillar/site/init.sls
+
+<stack:file name="/srv/pillar/stack/init.sls" mode="0640" rcs="false"/>
+git add pillar/stack/init.sls
+
+git commit -m "defaults"
+
+# updates backend salt keys if needed
+/opt/stack/bin/stack sync host config
+
+</stack:script>
+
+</stack:stack>

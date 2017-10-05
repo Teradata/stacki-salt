@@ -1,0 +1,31 @@
+<stack:stack>
+
+<description>
+Salt config for Clients
+</description>
+
+<stack:copyright>
+Copyright (c) 2006 - 2017 Teradata
+All rights reserved. Stacki(r) v5.x stacki.com
+https://github.com/Teradata/stacki/blob/master/LICENSE.txt
+</stack:copyright>
+
+<stack:script stack:stage="install-post">
+
+<stack:report name="host.salt">&hostname;</stack:report>
+
+<stack:file name="/etc/salt/pki/minion/minion_master.pub" perms="0444"><stack:eval>
+cat /etc/salt/pki/cluster/master.pub
+</stack:eval></stack:file>
+
+<stack:file name="/etc/salt/pki/minion/minion.pem" perms="0400"><stack:eval>
+cat /etc/salt/pki/cluster/minion.pem
+</stack:eval></stack:file>
+
+<stack:file name="/etc/salt/pki/minion/minion.pub" perms="0444"><stack:eval>
+cat /etc/salt/pki/cluster/minion.pub
+</stack:eval></stack:file>
+
+</stack:script>
+
+</stack:stack>
