@@ -58,10 +58,10 @@ import stack.commands
 
 
 class FileHandler(handler.ContentHandler,
-		  handler.DTDHandler,
-		  handler.EntityResolver,
-		  handler.ErrorHandler,
-		  stack.profile.AttributeHandler):
+			handler.DTDHandler,
+			handler.EntityResolver,
+			handler.ErrorHandler,
+		stack.profile.AttributeHandler):
 
 	def __init__(self, attrs):
 		handler.ContentHandler.__init__(self)
@@ -152,7 +152,7 @@ class Plugin(stack.commands.Plugin):
 		# left half configured.
 
 		node = open(os.path.join(self.pathCompiled, 
-					 host, 'kickstart.xml'), 'a')
+					host, 'kickstart.xml'), 'a')
 		node.write('<file')
 		for key in [ 'name', 'perms', 'owner', 'mode' ]:
 			if template.has_key(key):
@@ -176,7 +176,7 @@ class Plugin(stack.commands.Plugin):
 		# above file.
 
 		fout = open(os.path.join(self.pathCompiled, host, 'init.sls'),
-			    'a')
+				'a')
 		fout.write('%s:\n' % template['path'])
 
 		if template.has_key('watch'):
@@ -213,7 +213,7 @@ class Plugin(stack.commands.Plugin):
 		hasKey = False
 		try:
 			stream = file(os.path.join(self.pathCompiled, 
-						   'top.sls'), 'r')
+						'top.sls'), 'r')
 			dict = yaml.load(stream)
 			if dict['compiled'].has_key(host):
 				hasKey = True
@@ -222,14 +222,14 @@ class Plugin(stack.commands.Plugin):
 		if not hasKey:
 			dict['compiled'][host] = [ host ]
 			stream = file(os.path.join(self.pathCompiled, 
-						   'top.sls'), 'w')
+						'top.sls'), 'w')
 			yaml.dump(dict, stream)
 		
 
 	def run(self, hosts):
 
 		pathSource   = os.path.join(os.sep, 'export', 
-					    'stack', 'salt')
+						'stack', 'salt')
 		self.pathCompiled = os.path.join(pathSource, 'compiled')
 		attrs = {}
 		for host in hosts['hosts']:
@@ -302,5 +302,3 @@ class Plugin(stack.commands.Plugin):
 						for parsed in handler.getFiles():
 							if stack.cond.EvalCondExpr(parsed.get('cond'), host_attrs):
 								self.writeSalt(host, parsed)
-
-

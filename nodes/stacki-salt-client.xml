@@ -13,19 +13,32 @@ https://github.com/Teradata/stacki/blob/master/LICENSE.txt
 <stack:script stack:stage="install-post">
 
 <stack:report name="host.salt">&hostname;</stack:report>
-
-<stack:file name="/etc/salt/pki/minion/minion_master.pub" perms="0444"><stack:eval>
-cat /etc/salt/pki/cluster/master.pub
-</stack:eval></stack:file>
-
-<stack:file name="/etc/salt/pki/minion/minion.pem" perms="0400"><stack:eval>
-cat /etc/salt/pki/cluster/minion.pem
-</stack:eval></stack:file>
-
-<stack:file name="/etc/salt/pki/minion/minion.pub" perms="0444"><stack:eval>
-cat /etc/salt/pki/cluster/minion.pub
-</stack:eval></stack:file>
-
 </stack:script>
 
+<stack:script stack:stage="boot-post">
+token=`curl -sSk https://&salt.minion.master;:8000/login \
+      -H 'Accept: application/x-yaml' \
+      -d username=&salt.admin_user; \
+      -d password=&salt.admin_pass; \
+      -d eauth=pam  | grep token | awk -F":" '{print $2}'`
+
+curl -sSk https://&salt.minion.master;:8000 \
+    -H 'Accept: application/json' \
+    -H "X-Auth-Token: ${token}" \
+    -d client=runner \
+    -d fun=stackisalt.delete_key \
+    -d arg='&hostname;'
+
+systemctl start salt-minion
+
+sleep 30
+curl -sSk https://&salt.minion.master;:8000 \
+    -H 'Accept: application/json' \
+    -H "X-Auth-Token: ${token}" \
+    -d client=runner \
+    -d fun=stackisalt.accept_key \
+    -d arg='&hostname;'
+
+systemctl enable salt-minion
+</stack:script>
 </stack:stack>

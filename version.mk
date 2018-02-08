@@ -1,5 +1,4 @@
 export ROLL	= stacki-salt
-export VERSION	= 2017.7.1
-#export ROLLVERSION = 1.0
-export RELEASE  = 7.x
+export VERSION	= 2017.7.3
+export RELEASE  = redhat7
 COLOR		= darkturquoise

@@ -1,31 +1,31 @@
 # @SI_Copyright@
 #                               stacki.com
 #                                  v4.0
-# 
+#
 #      Copyright (c) 2006 - 2017 StackIQ Inc. All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
 # met:
-#  
+# 
 # 1. Redistributions of source code must retain the above copyright
 # notice, this list of conditions and the following disclaimer.
-#  
+# 
 # 2. Redistributions in binary form must reproduce the above copyright
 # notice unmodified and in its entirety, this list of conditions and the
-# following disclaimer in the documentation and/or other materials provided 
+# following disclaimer in the documentation and/or other materials provided
 # with the distribution.
-#  
-# 3. All advertising and press materials, printed or electronic, mentioning
-# features or use of this software must display the following acknowledgement: 
 # 
-# 	 "This product includes software developed by StackIQ" 
-#  
+# 3. All advertising and press materials, printed or electronic, mentioning
+# features or use of this software must display the following acknowledgement:
+#
+# 	 "This product includes software developed by StackIQ"
+# 
 # 4. Except as permitted for the purposes of acknowledgment in paragraph 3,
 # neither the name or logo of this software nor the names of its
 # authors may be used to endorse or promote products derived from this
 # software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY STACKIQ AND CONTRIBUTORS ``AS IS''
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
 # THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -45,7 +45,7 @@ import sys
 import string
 import stack.api as api
 import csv
-import cStringIO
+import io as cStringIO
 import stack.commands
 from stack.exception import *
 from salt.client.ssh.client import SSHClient
@@ -65,8 +65,8 @@ class Command(command):
 	can be used by "stack load hostfile" to preseed the database.
 
 	<param type='string' name='hosts'>
-	Comma delimited host name(s) or individual ips of machines to 
-	scan. This assumes host names are resolvable. If not, 
+	Comma delimited host name(s) or individual ips of machines to
+	scan. This assumes host names are resolvable. If not,
 	use the "network" parameter or use IPs.
 	</param>
 	
@@ -82,7 +82,7 @@ class Command(command):
 	</param>
 
 	<param type='boolean' name='ipmi'>
-	Scan for an ipmi network and get the IPMI interface information. 
+	Scan for an ipmi network and get the IPMI interface information.
 	Scans port 623. If you have changed IPMI
 	
 	Use: "Y/yes" "N/no" "T/true" or "F/false"
@@ -136,10 +136,10 @@ class Command(command):
 
 	<example cmd="create spreadsheet hostfile">
 	Basic:
-	stack create spreadsheet hostfile network=10.3.255.0/24 
+	stack create spreadsheet hostfile network=10.3.255.0/24
 	Intermediate:
-	stack create spreadsheet hostfile network=10.3.255.0/24 
-	network_name=public 
+	stack create spreadsheet hostfile network=10.3.255.0/24
+	network_name=public
 	Advanced:
 	stack create spreadsheet hostfile network=10.3.255.0/24 rack=10 rank=3
 	network_name=public appliance=edge
@@ -183,11 +183,12 @@ class Command(command):
 			vlan = interface.split('.')[1]	
 		else:
 			vlan = None
-		row = [ name, interface_hostname, 
-			default, appliance, rack, 
-			rank, ip, mac, interface, 
-			network, channel, options, 
-			vlan ]
+		row = [ name, interface_hostname,
+			default, appliance, rack,
+			rank, ip, mac, interface,
+			network, channel, options,
+			vlan, installaction, osaction,
+			groups, box, comment ]
 		rows.append(row)
 		del ifaces[k]
 
@@ -207,11 +208,12 @@ class Command(command):
 			if len(interface.split('.')) == 2:
 				vlan = interface.split([1])
 
-			row = [ name, interface_hostname, 
-				default, appliance, rack, 
-				rank, ip, mac, interface, 
-				network, channel, options, 
-				vlan ]
+			row = [ name, interface_hostname,
+				default, appliance, rack,
+				rank, ip, mac, interface,
+				network, channel, options,
+				vlan, installaction, osaction,
+				groups, box, comment ]
 
 			rows.append(row)
 			del ifaces[n]
@@ -237,7 +239,7 @@ class Command(command):
 		client = SSHClient()
 		# can't do hosts without a roster file, gotta build that
 		# or figure something out
-		mcmd = ["cat /proc/net/bonding/%s | egrep 'addr|Slave I'" 
+		mcmd = ["cat /proc/net/bonding/%s | egrep 'addr|Slave I'"
 			% bond]
 
 		output = client.cmd(tgt=host,fun='cmd.run', arg=mcmd)
@@ -277,7 +279,7 @@ class Command(command):
 			for j in nets:
 				if j['network'] in nlist:
 					mask,addr = j['mask'],j['address']
-					clist.append(IPv4Network(u'%s/%s' 
+					clist.append(IPv4Network(u'%s/%s'
 						% (addr,mask)))
 			if ip_network(clist[0]).compare_networks(ip_network
 					(clist[1])) == -1:
@@ -293,10 +295,10 @@ class Command(command):
 			ips = data[d]['ip4_interfaces']
 			hs = data[d]['host']
 			name = hs
-			# check for bonding, if bonded, process, and remove 
-			# pairs this is some truly sneaky-ass shit. If 
-			# there's bonding, the ifaces gets rewritten by 
-			# deleting the bond interface(s) and any interfaces 
+			# check for bonding, if bonded, process, and remove
+			# pairs this is some truly sneaky-ass shit. If
+			# there's bonding, the ifaces gets rewritten by
+			# deleting the bond interface(s) and any interfaces
 			# in the bond
 			ikeys = ifaces.keys()
 			bonds = [x for x in ikeys if "bond" in x]
@@ -326,7 +328,7 @@ class Command(command):
 						rank = None
 					else:
 						ip = ips[k][0]
-						# fuck you fucking 80 char 
+						# fuck you fucking 80 char
 						# count standard
 						network = \
 						self.get_network_name(ip)
@@ -346,42 +348,60 @@ class Command(command):
 							
 						mac = v
 					if len(interface.split('.')) == 2:
-						vlan = interface.split('.')[1]	
-					row = [ name, interface_hostname, 
-							default, appliance, 
-							rack, rank, ip, mac, 
-							interface, network, 
-							channel, options, vlan ]
+						vlan = interface.split('.')[1]
+					row = [ name, interface_hostname,
+							default, appliance,
+							rack, rank, ip, mac,
+							interface, network,
+							channel, options, vlan,
+							installaction, osaction,
+							groups, box, comment ]
 
 					rows.append(row)
 		
-		return rows 
+		return rows
 
 	def print_debug(self,chatty,contents):
-		if chatty == True: 
+		if chatty == True:
 			print(contents)
 		else:
 			None
 
 	def run(self, params, args):
-                (hosts, network, network_name, ipmi, sshport, ipfile, 
-		rosterfile, appliance, rack, rank, interface, chatty_flag, 
-			ofile, headers) = self.fillParams([
-                        ('hosts', None),
-                        ('network', None),
-                        ('network_name', 'private'),
-                        ('ipmi', False),
-                        ('sshport', 22),
-                        ('ipfile', None),
-                        ('rosterfile', '/etc/salt/roster'),
-                        ('appliance', 'backend'),
+		# make these global so you don't have to pass
+		# as options to the functions.
+		# This is safe as global variable is local to the
+		# module, so don't get your panties in a bunch.
+		global ip, mac, default, interface, network, channel, \
+				options, vlan, interface_hostname, \
+				rck, rnk, chatty, interface, \
+				installaction, osaction, groups, \
+				box, comment
+	
+		(hosts, network, network_name, ipmi, sshport, ipfile,
+		rosterfile, appliance, rack, rank, interface, chatty_flag,
+			ofile, headers, installaction, osaction, groups,
+			box, comment) = self.fillParams([
+			('hosts', None),
+			('network', None),
+			('network_name', 'private'),
+			('ipmi', False),
+			('sshport', 22),
+			('ipfile', None),
+			('rosterfile', '/etc/salt/roster'),
+			('appliance', 'backend'),
 			('rack', 0),
 			('rank', 0),
 			('interface', None),
 			('chatty', 'True'),
 			('output-file', '/root/discovered_hosts.csv'),
-			('output-headers', True)
-                        ])
+			('output-headers', True),
+			('installaction', 'default'),
+			('osaction', 'default'),
+			('group', ''),
+			('box', 'default'),
+			('comment', '')
+			])
 		#print(interface)
 		# Turn on/off progress messages.
 		chatty = stack.bool.str2bool(chatty_flag)
@@ -393,14 +413,6 @@ class Command(command):
 		ip = mac = default = channel = options \
 			= vlan = interface_hostname = None
 		
-		# make these global so you don't have to pass
-		# as options to the functions.
-		# This is safe as global variable is local to the
-		# module, so don't get your panties in a bunch.
-		global ip, mac, default, interface, network, channel, \
-				options, vlan, interface_hostname, \
-				rck, rnk, chatty, interface
-	
 		# The implementation does the following:
 		# 1. nmaps the SSH port (22) on the given network to see
 		# if we can actually connect.
@@ -410,51 +422,52 @@ class Command(command):
 		if stack.bool.str2bool(ipmi) == False:
 
 			self.runImplementation('discover', \
-			(hosts, network, ipmi, sshport, ipfile, 
+			(hosts, network, ipmi, sshport, ipfile,
 				rosterfile,chatty,interface))
 
 			self.print_debug(chatty,"\nCreating CSV output.\n")
 		else:
 			msg = "IPMI network scanning is not implemented yet."
 			raise CommandError(self, msg)
-			self.runImplementation('discover_ipmi', 
+			self.runImplementation('discover_ipmi',
 				(hosts, network, ipmi))
 			print_debug("\nCreating CSV output.\n")
 		# this all depends on the roster containing hosts. If it doesn't
-		# nothing else will work, so bail, be helpful. 
+		# nothing else will work, so bail, be helpful.
 
 		if os.stat(rosterfile).st_size == 0:
 			raise CommandError(self,"No hosts found or accessible.")
 
-		header = ['NAME', 'INTERFACE HOSTNAME', 'DEFAULT', 'APPLIANCE', 
+		header = ['NAME', 'INTERFACE HOSTNAME', 'DEFAULT', 'APPLIANCE',
 			'RACK', 'RANK', 'IP', 'MAC', 'INTERFACE', 'NETWORK',
-                        'CHANNEL', 'OPTIONS', 'VLAN']
-		
+			'CHANNEL', 'OPTIONS', 'VLAN', 'INSTALLACTION', 'OSACTION',
+			'GROUPS', 'BOX', 'COMMENT']
+#		installaction, osaction, groups, box, comment
 		# CSV writer requires fileIO.
-                # Setup string IO processing
-                csv_f = cStringIO.StringIO()
-                csv_w = csv.writer(csv_f)
+		# Setup string IO processing
+		csv_f = cStringIO.StringIO()
+		csv_w = csv.writer(csv_f)
 		if headers == True:
-	                csv_w.writerow(header)
-		# collect all the bluidy rows 
+			csv_w.writerow(header)
+		# collect all the bluidy rows
 		rows = self.doHosts(hosts,appliance,network_name)
 
 		# sort the damn thing while we are at it.
 		for r in sorted(rows,key=itemgetter(0)):
 			csv_w.writerow(r)
-                
+
 		# Get string from StringIO object
-                s = csv_f.getvalue().strip()
-                csv_f.close()
+		s = csv_f.getvalue().strip()
+		csv_f.close()
 		if chatty == True:
-                	self.beginOutput()
-	                self.addOutput('',s)
+			self.beginOutput()
+			self.addOutput('',s)
 			self.endOutput()
 
-		self.print_debug(chatty,"Writing discovered hosts to %s.\n" 
+		self.print_debug(chatty,"Writing discovered hosts to %s.\n"
 					% ofile)
 		f = open(ofile,'w')
-	        f.write(s)
+		f.write(s)
 		f.close()
 		# clean up /etc/hosts which we have been manipulating
 		self.print_debug(chatty,"Cleaning up.\n")

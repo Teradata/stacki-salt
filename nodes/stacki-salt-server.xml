@@ -11,9 +11,17 @@ https://github.com/Teradata/stacki/blob/master/LICENSE.txt
 </stack:copyright>
 
 <stack:package>stacki-salt-command</stack:package>
+<stack:package>foundation-scapy3</stack:package>
+<stack:package>tcpdump</stack:package>
 
 <!-- needed for brownfield discovery -->
 <stack:script stack:stage="install-post">
+saltadminpass=`/opt/stack/sbin/gen_random_pw`
+adminpass=`openssl passwd -crypt ${saltadminpass}`
+/opt/stack/bin/stack set attr attr=salt.admin_user value=saltadmin
+/opt/stack/bin/stack set attr attr=salt.admin_pass value=${saltadminpass} shadow=true
+
+useradd -G wheel -p ${adminpass} saltadmin
 
 /opt/stack/bin/stack set attr attr=salt.master.interface         value=&Kickstart_PrivateAddress;
 /opt/stack/bin/stack set attr attr=salt.master.log_level         value=info
@@ -26,6 +34,8 @@ https://github.com/Teradata/stacki/blob/master/LICENSE.txt
 /opt/stack/bin/stack set attr attr=salt.minion.log_level_logstack value=warning
 /opt/stack/bin/stack set attr attr=salt.minion.startup_states    value=highstate
 
+/opt/stack/bin/stack set attr attr=run.host.impl value=salt
+
 /opt/stack/bin/stack set host attr &hostname; attr=salt.master   value=true
 /opt/stack/bin/stack set host attr &hostname; attr=salt.minion.disable_modules \
 	value="[ cmd, test ]"
@@ -34,31 +44,48 @@ https://github.com/Teradata/stacki/blob/master/LICENSE.txt
 mkdir -p /etc/salt/pki/master
 mkdir -p /etc/salt/master.d
 cd /etc/salt
-git init
 
 /opt/stack/bin/stack report host salt &hostname; | \
 	/opt/stack/bin/stack report script | sh
 
-git add master 
-git add minion
 
-<stack:file name="/etc/salt/master.d/acl.conf" mode="0640" rcs="false">
+<stack:file stack:name="/etc/salt/master.d/acl.conf" stack:mode="0640" stack:rcs="false">
 client_acl: 
   apache:
     - stack-*
     - mcli.*
     - storagemonitor.*
-</stack:file>
-git add master.d/acl.conf
 
-<stack:file name="/etc/salt/master.d/roots.conf" mode="0640" rcs="false">
+external_auth:
+  pam:
+    saltadmin:
+      - .*
+      - '@wheel'
+      - '@saltutil'
+      - '@runner'
+</stack:file>
+
+<stack:file stack:name="/etc/salt/master.d/roots.conf" stack:mode="0640" stack:rcs="false">
 stack:file_roots: 
   base:
     - /srv/salt
   compiled:
     - /export/stack/salt/compiled
+
+runner_dirs:
+  - /srv/runners
 </stack:file>
-git add master.d/roots.conf
+
+<stack:file stack:name="/etc/salt/master.d/saltapi.conf" stack:mode="0640" stack:rcs="false">
+rest_tornado:
+    # can be any port
+    host: &Kickstart_PrivateAddress;
+    port: 8000
+    ssl_crt: /etc/salt/pki/private/cert.pem
+    ssl_key: /etc/salt/pki/private/key.pem
+    debug: True
+    disable_ssl: False
+</stack:file>
 
 <!-- Change Permissions on the salt master,
      and jobs directories to allow read/exec
@@ -73,11 +100,26 @@ chmod og+rx /var/cache/salt/master/jobs
 chmod og+rx /var/run/salt/
 chmod og+rx /var/run/salt/master
 
+<!-- setup certs for the api -->
+mkdir -p /etc/salt/pki/private
+openssl genrsa -out /etc/salt/pki/private/key.pem 4096 &gt; /dev/null 2&gt;&amp;1
+openssl req -config /etc/security/ca/ca.cfg -new -x509 \
+	-key /etc/salt/pki/private/key.pem \
+	-out /etc/salt/pki/private/cert.pem \
+	-days 1826 -batch
+
 <!-- Turn on salt-master -->
-ln -s /opt/stack/bin/salt-minion /usr/bin/salt-minion
+ln -s /opt/stack/bin/salt-master /usr/bin/salt-master
+ln -s /opt/stack/bin/salt-api /usr/bin/salt-api
 
 systemctl enable salt-master.service
 systemctl start salt-master.service
+
+systemctl enable salt-minion.service
+systemctl start salt-minion.service
+
+systemctl enable salt-api.service
+systemctl start salt-api.service
 
 <!-- /etc/salt/pki/{master|minion}
 
@@ -90,35 +132,12 @@ mkdir -p /etc/salt/pki/master/minions
 mkdir -p /etc/salt/pki/minion
 
 /opt/stack/bin/salt-key --gen-keys=master --gen-keys-dir=/etc/salt/pki/master
-git add pki/master/master.pem  
-git add pki/master/master.pub 
 
 /opt/stack/bin/salt-key --gen-keys=minion --gen-keys-dir=/etc/salt/pki/minion
-git add pki/minion/minion.pem   
-git add pki/minion/minion.pub 
  
 cp /etc/salt/pki/minion/minion.pub /etc/salt/pki/master/minions/&hostname;
-git add pki/master/minions/&hostname;
 
 cp /etc/salt/pki/master/master.pub /etc/salt/pki/minion/minion_master.pub 
-git add pki/minion/minion_master.pub 
-
-<!-- /etc/salt/pki/cluster
-
-     Place a copy of the master.pub and minion.{pem|pub} keys into
-     a directory that is readable by Apache.  This will allow us to
-     pick up the keys during Kickstart.  All Minions get the same
-     keys.
--->
-
-mkdir -p /etc/salt/pki/cluster
-
-install -m0444 -g apache /etc/salt/pki/master/master.pub /etc/salt/pki/cluster/
-install -m0444 -g apache /etc/salt/pki/minion/minion.pub /etc/salt/pki/cluster/
-install -m0444 -g apache /etc/salt/pki/minion/minion.pem /etc/salt/pki/cluster/
-git add pki/cluster
-
-git commit -m "defaults"
 
 <!-- /etc/salt/pki/master/ssh
 
@@ -132,8 +151,6 @@ git commit -m "defaults"
 mkdir -p /etc/salt/pki/master/ssh
 cp /root/.ssh/id_rsa /etc/salt/pki/master/ssh/salt-ssh.rsa
 cp /root/.ssh/id_rsa /etc/salt/pki/master/ssh/salt-ssh.rsa.pub
-git add pki/master/ssh
-git commit -m defaults
 
 <!-- Setup the Salt State areas -->
 
@@ -141,19 +158,12 @@ mkdir -p /srv/salt/stack
 mkdir -p /srv/salt/site
 mkdir -p /srv/pillar/stack
 mkdir -p /srv/pillar/site
+mkdir -p /srv/runners
 mkdir -p /export/stack/salt/compiled
-
-<!-- Create a Git Repo in the salt states directories -->
-cd /export/stack/salt
-git init
-git commit -m "defaults"
-
-cd /srv 
-git init 
 
 <!-- Setup default top.sls stack:file to refer to stack states
      and site-specific states. -->
-<stack:file name="/srv/salt/top.sls" mode="0640" rcs="false">
+<stack:file stack:name="/srv/salt/top.sls" stack:mode="0640" stack:rcs="false">
 base:
 
   '*':
@@ -165,16 +175,13 @@ base:
     - stack.hosts
 
 </stack:file>
-git add salt/top.sls
 
-<stack:file name="/srv/salt/site/init.sls" mode="0640" rcs="false"/>
-git add salt/site/init.sls 
+<stack:file stack:name="/srv/salt/site/init.sls" stack:mode="0640" stack:rcs="false"/>
 
-<stack:file name="/srv/salt/stack/init.sls" mode="0640" rcs="false"/>
-git add salt/stack/init.sls
+<stack:file stack:name="/srv/salt/stack/init.sls" stack:mode="0640" stack:rcs="false"/>
 
 <!-- Create a default hosts sls stack:file to distribute /etc/hosts stack:file -->
-<stack:file name="/srv/salt/stack/hosts.sls" mode="0640" rcs="false">
+<stack:file stack:name="/srv/salt/stack/hosts.sls" stack:mode="0640" stack:rcs="false">
 /etc/hosts:
   stack:file.managed:
     - source: salt://stack/hosts
@@ -182,13 +189,12 @@ git add salt/stack/init.sls
     - group: root
     - mode: 644
 </stack:file>
-git add salt/stack/hosts.sls
 
 <!-- Create link to /etc/hosts from within the salt states directory -->
 ln -s /etc/hosts /srv/salt/stack/hosts
 
 <!-- Create default pillar config stack:file -->
-<stack:file name="/srv/pillar/top.sls" mode="0640" rcs="false"> 
+<stack:file stack:name="/srv/pillar/top.sls" stack:mode="0640" stack:rcs="false"> 
 base:
 
   '*':
@@ -196,18 +202,45 @@ base:
     - stack.{{ grains['id'] }}
     - site
 </stack:file>
-git add pillar/top.sls
 
-<stack:file name="/srv/pillar/site/init.sls" mode="0640" rcs="false"/>
-git add pillar/site/init.sls
+<stack:file stack:name="/srv/pillar/site/init.sls" stack:mode="0640" stack:rcs="false"/>
 
-<stack:file name="/srv/pillar/stack/init.sls" mode="0640" rcs="false"/>
-git add pillar/stack/init.sls
+<stack:file stack:name="/srv/pillar/stack/init.sls" stack:mode="0640" stack:rcs="false"/>
 
-git commit -m "defaults"
+<stack:file stack:name="/srv/runners/__init__.py" stack:rcs="false"/>
 
+<stack:file stack:name="/srv/runners/stackisalt.py">
+# -*- coding: utf-8 -*-
+'''
+Accept keys automatically
+'''
+
+import salt.config
+import salt.wheel
+import salt.client
+from time import sleep
+
+def delete_key(minion):
+    opts = salt.config.master_config('/etc/salt/master')
+    wheel = salt.wheel.Wheel(opts)
+    try:
+        wheel.call_func('key.delete', match=minion)  
+        return('Key Deleted')
+    except: 
+        pass
+
+def accept_key(minion):
+    opts = salt.config.master_config('/etc/salt/master')
+    wheel = salt.wheel.Wheel(opts)
+    # accept the key
+    wheel.call_func('key.accept', match=minion)
+    return('Key Accepted')
+</stack:file>
+
+<!--
 # updates backend salt keys if needed
 /opt/stack/bin/stack sync host config
+-->
 
 </stack:script>
 

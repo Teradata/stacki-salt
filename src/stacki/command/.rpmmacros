@@ -1,5 +1,5 @@
-%_topdir		/export/src/stacki-salt/src/stacki/command/../../../build-stacki-salt-master
-%buildroot	/export/src/stacki-salt/src/stacki/command/stacki-salt-command.buildroot
+%_topdir		/state/partition1/src/stacki-salt/src/stacki/command/../../../build-stacki-salt-develop
+%buildroot	/state/partition1/src/stacki-salt/src/stacki/command/stacki-salt-command.buildroot
 %_var		/var
 %debug_package	%{nil}
 %__os_install_post    \

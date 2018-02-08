@@ -1,31 +1,31 @@
 # @SI_Copyright@
 #                               stacki.com
 #                                  v4.0
-# 
+#
 #      Copyright (c) 2006 - 2017 StackIQ Inc. All rights reserved.
-# 
+#
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
 # met:
-#  
+# 
 # 1. Redistributions of source code must retain the above copyright
 # notice, this list of conditions and the following disclaimer.
-#  
+# 
 # 2. Redistributions in binary form must reproduce the above copyright
 # notice unmodified and in its entirety, this list of conditions and the
-# following disclaimer in the documentation and/or other materials provided 
+# following disclaimer in the documentation and/or other materials provided
 # with the distribution.
-#  
-# 3. All advertising and press materials, printed or electronic, mentioning
-# features or use of this software must display the following acknowledgement: 
 # 
-# 	 "This product includes software developed by StackIQ" 
-#  
+# 3. All advertising and press materials, printed or electronic, mentioning
+# features or use of this software must display the following acknowledgement:
+#
+# 	 "This product includes software developed by StackIQ"
+# 
 # 4. Except as permitted for the purposes of acknowledgment in paragraph 3,
 # neither the name or logo of this software nor the names of its
 # authors may be used to endorse or promote products derived from this
 # software without specific prior written permission.
-# 
+#
 # THIS SOFTWARE IS PROVIDED BY STACKIQ AND CONTRIBUTORS ``AS IS''
 # AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
 # THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
@@ -44,7 +44,7 @@ import os
 import string
 from stack.api import get
 import csv
-import cStringIO
+import io as cStringIO
 import stack.commands
 from stack.exception import *
 from salt.client.ssh.client import SSHClient
@@ -52,14 +52,14 @@ from ipaddress import IPv4Address,IPv4Network,\
 	IPv6Address,IPv6Network,ip_network
 import subprocess
 import sys
-import ipaddress 
+import ipaddress
 import struct
 import socket
 import stack.bool
 import logging
 import stack.util
 logging.getLogger("scapy.runtime").setLevel(logging.ERROR)
-from scapy.all import arping,conf,srp,Ether,ARP,sr,IP,TCP 
+from scapy.all import *
 from datetime import datetime, date, time
 
 class Implementation(stack.commands.Implementation):
@@ -98,7 +98,7 @@ class Implementation(stack.commands.Implementation):
 			return iface
 		
 	def check_host_net(self,hosts):
-                subnets = self.owner.call('list.network')
+		subnets = self.owner.call('list.network')
 		a = {}
 		h = []
 		for host in hosts:
@@ -138,13 +138,13 @@ class Implementation(stack.commands.Implementation):
 		else:
 			# assume you got a network name
 			networks = []
-		        for row in self.owner.call('list.network'):
-       		        	if network == row['network']:
+			for row in self.owner.call('list.network'):
+				if network == row['network']:
 					net = row['address']
 					cidr = row['mask']
 		try:	
 			n = IPv4Network(u'%s/%s' % (net,cidr))
-		except ValueError, e:
+		except ValueError as e:
 			msg = '%s. Maybe fix that?' % e
 			raise CommandError(self,msg)
 
@@ -188,7 +188,7 @@ class Implementation(stack.commands.Implementation):
 				ssh[o] = { 'ip': ip, 'name': name, \
 						'fqdn': fqdn }
 			else:
-				no_ssh.append(o) 
+				no_ssh.append(o)
 
 		if len(no_ssh) > 0:
 			msg = "Unable to access %s " % no_ssh
@@ -198,7 +198,7 @@ class Implementation(stack.commands.Implementation):
 			print(msg)
 
 		if len(ssh) > 0:
-			for k,v in ssh.iteritems():
+			for k,v in ssh.items():
 				name = ssh[k]['name']
 				ip = ssh[k]['ip']
 				fqdn = ssh[k]['fqdn']
@@ -221,7 +221,7 @@ class Implementation(stack.commands.Implementation):
 			msg += "Are you sure you have access to that network?\n"
 			raise CommandError(self,msg)
 		else:
-			msg = "Scanning for live machines with SSH " 
+			msg = "Scanning for live machines with SSH "
 			msg += "on port %s\n" % port
 			self.owner.print_debug(chatty,msg)
 			try:
@@ -243,7 +243,7 @@ class Implementation(stack.commands.Implementation):
 				return sorted(sships)
 
 	def run(self, args):
-                (hosts, network, ipmi, sshport, ipfile, rosterfile, chatty, interface) = args
+		(hosts, network, ipmi, sshport, ipfile, rosterfile, chatty, interface) = args
 		scanitems = []
 
 		if hosts:
@@ -265,7 +265,7 @@ class Implementation(stack.commands.Implementation):
 				iface = self.check_nets(net)
 				if iface == None:
 					msg = "Can't access %s.\n" % network
-					msg += "No valid interface found." 
+					msg += "No valid interface found."
 					raise CommandError(self, msg)
 				if validnet:
 					scanitems.append(str(validnet))
@@ -276,7 +276,7 @@ class Implementation(stack.commands.Implementation):
 			f.close
 			iface = self.check_host_net(hosts)
 			for h in hosts:
-		               	scanitems.append(h)
+				scanitems.append(h)
 
 		if hosts == None and network == None and ipfile == None:
 			msg = 'A "hosts" or "network" parameter is required.'
@@ -297,7 +297,7 @@ class Implementation(stack.commands.Implementation):
 				raise CommandError(self,err)
 
 			if len(s) == 0:
-				raise CommandError(self,"No ips found for %s" 
+				raise CommandError(self,"No ips found for %s"
 						% network)
 			else:
 				msg = "Creating %s and /etc/hosts files." \
@@ -307,3 +307,5 @@ class Implementation(stack.commands.Implementation):
 				self.create_host_files()
 			
 		self.cleanup('/etc/salt/roster')
+
+RollName = "stacki-salt"

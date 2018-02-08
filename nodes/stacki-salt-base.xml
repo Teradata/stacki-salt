@@ -14,11 +14,20 @@ https://github.com/Teradata/stacki/blob/master/LICENSE.txt
 	<!-- Salt from Saltstack.org and dependencies -->
 
 <stack:package>stacki-salt</stack:package>
-
+<stack:package>foundation-python-requests</stack:package>
+<stack:package>foundation-python-PyYAML</stack:package>
+<stack:package>foundation-python-MarkupSafe</stack:package>
+<stack:package>foundation-python-Jinja2</stack:package>
+<stack:package>foundation-python-pyzmq</stack:package>
+<stack:package>foundation-python-chardet</stack:package>
+<stack:package>foundation-python-urllib3</stack:package>
+<stack:package>foundation-python-certifi</stack:package>
+<stack:package>foundation-python-idna</stack:package>
+<stack:package>foundation-python-requests</stack:package>
+<stack:package>foundation-python-six</stack:package>
 <!-- Turn on the Salt Minion -->
 <stack:script stack:stage="install-post">
 mkdir -p /etc/salt/pki/minion
-systemctl enable salt-minion
 
 ln -s /opt/stack/bin/salt-minion /usr/bin/salt-minion
 </stack:script>
