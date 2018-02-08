@@ -11,7 +11,6 @@ https://github.com/Teradata/stacki/blob/master/LICENSE.txt
 </stack:copyright>
 
 <stack:package>stacki-salt-command</stack:package>
-<stack:package>foundation-scapy3</stack:package>
 <stack:package>tcpdump</stack:package>
 
 <!-- needed for brownfield discovery -->
