@@ -56,76 +56,75 @@ class Command(stack.commands.sync.host.command):
 	is run on all 'managed' hosts. 
 	</arg>
 
-       	<param type='bool' name='test' optional='1'>
-        If set to TRUE perform a dryrun and only list out the current state of
-        the specified host(s).  The default is FALSE.
-        </param>
+	<param type='bool' name='test' optional='1'>
+	If set to TRUE perform a dryrun and only list out the current state of
+	the specified host(s).  The default is FALSE.
+	</param>
 
-        <param type='string' name='name' optional='1'>
-        Used in conjuction with the FUNCTION parameter run only one state
-        rather than the entire Salt highstate.
-        </param>
+	<param type='string' name='name' optional='1'>
+	Used in conjuction with the FUNCTION parameter run only one state
+	rather than the entire Salt highstate.
+	</param>
 
-        <param type='string' name='function' optional='1'>
-        Used in conjuction with the NAME parameter run only one state
-        rather than the entire Salt highstate.
-        </param>
+	<param type='string' name='function' optional='1'>
+	Used in conjuction with the NAME parameter run only one state
+	rather than the entire Salt highstate.
+	</param>
 
-        <param type='string' name='sls' optional='1'>
-        Used to specify a unique .sls file to be used, rather than the
-        entire salt file tree.
-        </param>
+	<param type='string' name='sls' optional='1'>
+	Used to specify a unique .sls file to be used, rather than the
+	entire salt file tree.
+	</param>
 
 	<example cmd='sync host state backend-0-0'>
 	Sets backend-0-0 to the salt highstate.
 	</example>
 
-        <example cmd='sync host state backend-0-0 test=true'>
+	<example cmd='sync host state backend-0-0 test=true'>
 	Dry run of highstate for backend-0-0.  This is usefull to inspect the
-        currect state (and what is not in sync), and to see the full list of
-        names and functions in the highstate.
+	currect state (and what is not in sync), and to see the full list of
+	names and functions in the highstate.
 	</example>
 
 	<example cmd='sync host state backend-0-0 name=user-root function=user.present'>
-        Run the named state user-root function user.present on backend-0-0.  If the
-        Attribute sync.root is defined as true this will set the root account password
-        to the crypted valued stored in the attribute Kickstart_PrivateRootPassword.
+	Run the named state user-root function user.present on backend-0-0.  If the
+	Attribute sync.root is defined as true this will set the root account password
+	to the crypted valued stored in the attribute Kickstart_PrivateRootPassword.
 	</example>
 	"""
 
 
 	def run(self, params, args):
 		hosts = self.getHostnames(args, managed_only=True)
-                
 		(function, name, sls, test, timeout) = self.fillParams([
-                    ('function', None),
-                    ('name', None),
-                    ('sls', None),
-                    ('test', None),
-                    ('timeout', 30) ])
-                 
-                test = self.str2bool(test)
-                
+			('function', None),
+			('name', None),
+			('sls', None),
+			('test', None),
+			('timeout', 30) ])
+
+		test = self.str2bool(test)
+
 		self.beginOutput()
 
 		client = salt.client.LocalClient()
-                if sls:
+		if sls:
 			job = client.cmd_async(hosts,
-					       fun='state.sls',
-					       arg=[ sls ],
-					       expr_form='list')
+					fun='state.sls',
+					arg=[ sls ],
+					tgt_type='list')
 		elif function or name:
-                        if not (function and name):
-                                raise ParamRequired(self, ('function', 'name'))
+			if not (function and name):
+				raise ParamRequired(self, ('function', 'name'))
 			job = client.cmd_async(hosts,
-					       fun='state.single',
-					       arg=[ function, 'name=%s' % name, 'test=%s' % test ],
-					       expr_form='list')
+						fun='state.single',
+						arg=[ function, 'name=%s' % name, 'test=%s' % test ],
+						tgt_type='list')
 		else:
 			job = client.cmd_async(hosts,
-					       fun='state.highstate',
-					       arg=['test=%s' % test],
-					       expr_form='list')
+						fun='state.highstate',
+						arg=['test=%s' % test],
+						tgt_type='list')
 
 		if job:
 			while timeout:
@@ -136,17 +135,17 @@ class Command(stack.commands.sync.host.command):
 				timeout -= 1
 
 
-                for host in hosts:
-                        if result.has_key(host):
-				if result[host].has_key('ret'):
+		for host in hosts:
+			if host in result:
+				if 'ret' in result[host]:
 					ret = result[host]['ret']
 					if ret:
-						for key in ret.keys():
+						for key in ret:
 							list     = key.split('_|-')
 							function = '%s.%s' % (list[0], list[3])
 							id       = list[1]
 							name = None
-							if ret[key].has_key('name'):
+							if 'name' in ret[key]:
 								name = ret[key]['name']
 							self.addOutput(host, [
 									name,
@@ -157,5 +156,3 @@ class Command(stack.commands.sync.host.command):
 				self.addOutput(host, [None, None, False, 'Command not run'])
 		
 		self.endOutput(header=['host', 'name', 'function', 'result', 'comment'], trimOwner=False)
-
-

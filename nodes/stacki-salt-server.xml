@@ -11,10 +11,16 @@ https://github.com/Teradata/stacki/blob/master/LICENSE.txt
 </stack:copyright>
 
 <stack:package>stacki-salt-command</stack:package>
-<stack:package>tcpdump</stack:package>
 
 <!-- needed for brownfield discovery -->
 <stack:script stack:stage="install-post">
+<!-- this is a fix for stack-command  which should have 
+     removed all salt references but hasn't. -->
+SDIR="/opt/stack/lib/python3.6/site-packages/stack/commands/list/node/salt"
+XDIR="/opt/stack/lib/python3.6/site-packages/stack/commands/list/node/xml"
+mv ${SDIR}/plugin_salt.py ${XDIR}/plugin_salt.py
+rm -fr /opt/stack/lib/python3.6/site-packages/stack/commands/list/node/salt
+
 saltadminpass=`/opt/stack/sbin/gen_random_pw`
 adminpass=`openssl passwd -crypt ${saltadminpass}`
 /opt/stack/bin/stack set attr attr=salt.admin_user value=saltadmin
@@ -65,7 +71,7 @@ external_auth:
 </stack:file>
 
 <stack:file stack:name="/etc/salt/master.d/roots.conf" stack:mode="0640" stack:rcs="false">
-stack:file_roots: 
+file_roots: 
   base:
     - /srv/salt
   compiled:
@@ -182,7 +188,7 @@ base:
 <!-- Create a default hosts sls stack:file to distribute /etc/hosts stack:file -->
 <stack:file stack:name="/srv/salt/stack/hosts.sls" stack:mode="0640" stack:rcs="false">
 /etc/hosts:
-  stack:file.managed:
+  file.managed:
     - source: salt://stack/hosts
     - user: root
     - group: root

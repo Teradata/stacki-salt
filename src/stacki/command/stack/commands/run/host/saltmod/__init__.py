@@ -77,7 +77,7 @@ class Command(stack.commands.Command,
 
 		client = salt.client.LocalClient()
 		op = client.cmd(minions, command,
-				args_list, expr_form = 'list')
+				args_list, tgt_type = 'list')
 
 		self.beginOutput()
 		for o in op:

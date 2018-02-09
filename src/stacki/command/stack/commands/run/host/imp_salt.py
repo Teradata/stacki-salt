@@ -42,6 +42,7 @@
 
 import salt.client
 import stack.commands
+from stack.exception import *
 
 class Implementation(stack.commands.Implementation):
 	def run(self, args):
@@ -62,14 +63,17 @@ class Implementation(stack.commands.Implementation):
 		client = salt.client.LocalClient()
 
 		result = client.cmd(hosts, 'cmd.run', [ cmd ], tgt_type='list')
-		print("using salt")
 		for host in hosts:
 			if host not in result.keys():
 				result[host] = False
 		host_output = {}
 		for host, status in result.items():
-			host_output[host] = result[host]
+			if status == True:
+				host_output[host] = result[host]
 
+		if bool(host_output) == False:
+			raise CommandError('', 'No hosts up.')
+			
 		for host in hosts:
 			if collate:
 				out = host_output[host].split('\n')

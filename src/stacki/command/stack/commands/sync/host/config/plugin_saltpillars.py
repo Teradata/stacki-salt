@@ -63,7 +63,7 @@ class Plugin(stack.commands.Plugin):
 			attrs[row['host']][row['attr']] = row['value']
 
 		for host in hosts['hosts']:
-			fout  = file(os.path.join(path, '%s.sls' % host), 'w')
+			fout  = open(os.path.join(path, '%s.sls' % host), 'w')
 			keys  = sorted(attrs[host].keys())
 			fout.write(stack.text.DoNotEdit())
 			for key in keys:

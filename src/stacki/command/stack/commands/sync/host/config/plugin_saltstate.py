@@ -74,54 +74,54 @@ class FileHandler(handler.ContentHandler,
 		return self.files
 
 	def startElement(self, name, attrs):
-		if name == 'file':
-			path  = attrs.get('name')
-			perms = attrs.get('perms')
-			owner = attrs.get('owner')
-			cond  = attrs.get('cond')
-			watch = attrs.get('watch')
-			req   = attrs.get('require')
-			mode  = attrs.get('mode')
+		if name == 'stack:file':
+			path  = attrs.get('stack:name')
+			perms = attrs.get('stack:perms')
+			owner = attrs.get('stack:owner')
+			cond  = attrs.get('stack:cond')
+			watch = attrs.get('stack:watch')
+			req   = attrs.get('stack:require')
+			mode  = attrs.get('stack:mode')
 
 			self.text = ''
 			if not path:
 				return
 
 			self.curr = {}
-			self.curr['name'] = path
-			self.curr['path'] = path
+			self.curr['stack:name'] = path
+			self.curr['stack:path'] = path
 			if watch:
-				self.curr['watch'] = watch
+				self.curr['stack:watch'] = watch
 			if req:
-				self.curr['require'] = req
+				self.curr['stack:require'] = req
 			if perms:
-				self.curr['perms'] = perms
+				self.curr['stack:perms'] = perms
 			if mode:
-				self.curr['mode'] = mode
+				self.curr['stack:mode'] = mode
 			if owner:
 				user  = owner
 				group = None
 				for sep in [ '.', ':' ]:
 					if len(owner.split(sep)) == 2:
 						(user, group) = owner.split(sep)
-				self.curr['owner'] = owner
-				self.curr['user']  = user
+				self.curr['stack:owner'] = owner
+				self.curr['stack:user']  = user
 				if group:
-					self.curr['group'] = group
+					self.curr['stack:group'] = group
 			if cond:
-				self.curr['cond'] = cond
+				self.curr['stack:cond'] = cond
 		else:
 			list = []
 			for (k,v) in attrs.items():
 				list.append(' %s="%s"' % (k,v))
-			self.text += '<%s%s>' % (name, string.join(list, ','))
+			self.text += '<%s%s>' % (name, ','.join(list))
 
 	def endElement(self, name):
-		if name == 'file':
-			self.curr['content'] = self.text
+		if name == 'stack:file':
+			self.curr['stack:content'] = self.text
 			self.files.append(self.curr)
 		else:
-			self.text += '</%s>' % name
+			self.text += '</stack:%s>' % name
 
 	def characters(self, s):
 
@@ -153,23 +153,22 @@ class Plugin(stack.commands.Plugin):
 
 		node = open(os.path.join(self.pathCompiled, 
 					host, 'kickstart.xml'), 'a')
-		node.write('<file')
-		for key in [ 'name', 'perms', 'owner', 'mode' ]:
-			if template.has_key(key):
+		node.write('<stack:file')
+		for key in [ 'stack:name', 'stack:perms', 'stack:owner', 'stack:mode' ]:
+			if key in template:
 				node.write(' %s="%s"' % (key, template[key]))
 		node.write('>')
-		node.write(saxutils.escape(template['content']))
-		node.write('</file>\n')
+		node.write(saxutils.escape(template['stack:content']))
+		node.write('</stack:file>\n')
 
 		node.close()
 
-		# Create the host specific compliled template file.
+		# Create the host specific compiled template file.
 		# This is parsing the XML and expanding all the host
 		# attributes.
-
-		filename = template['path'].replace(os.sep, '_')
+		filename = template['stack:path'].replace(os.sep, '_')
 		fout = open(os.path.join(dir, filename), 'w')
-		fout.write(template['content'])
+		fout.write(template['stack:content'])
 		fout.close()
 
 		# Append to the salt state file to register to 
@@ -177,30 +176,29 @@ class Plugin(stack.commands.Plugin):
 
 		fout = open(os.path.join(self.pathCompiled, host, 'init.sls'),
 				'a')
-		fout.write('%s:\n' % template['path'])
+		fout.write('%s:\n' % template['stack:path'])
 
-		if template.has_key('watch'):
+		if 'stack:watch' in template:
 			fout.write('  cmd:\n')
 			fout.write('    - wait\n')
 			fout.write('    - watch:\n')
 			fout.write('      - file: %s\n' % template['watch'])
 
-		if template.has_key('mode'):
+		if 'stack:mode' in template:
 			fout.write('  file.append:\n')
 			fout.write('    - source: salt://%s/%s\n' % (host, filename))
 		else:
 			fout.write('  file.managed:\n')
 			fout.write('    - source: salt://%s/%s\n' % (host, filename))
 
-		for key in [ 'user', 'group', 'perms' ]:
-			if template.has_key(key):
-				if key == 'perms':
-					fout.write('    - mode: %s\n'  % (key, 
-						template[key]))
+		for key in [ 'stack:user', 'stack:group', 'stack:perms' ]:
+			if key in template:
+				if key == 'stack:perms':
+					print(key)
+					fout.write('    - mode: %s\n'  % (template[key]))
 				else:
-					fout.write('    - mode: %s\n'  % (key, 
-						template[key]))
-		if template.has_key('require'):
+					fout.write('    - mode: %s\n'  % (template[key]))
+		if 'stack:require' in template:
 			fout.write('    - require:\n')
 			fout.write('      - file: %s\n' % template['require'])
 
@@ -212,16 +210,16 @@ class Plugin(stack.commands.Plugin):
 
 		hasKey = False
 		try:
-			stream = file(os.path.join(self.pathCompiled, 
+			stream = open(os.path.join(self.pathCompiled, 
 						'top.sls'), 'r')
 			dict = yaml.load(stream)
-			if dict['compiled'].has_key(host):
+			if host in dict['compiled']:
 				hasKey = True
 		except IOError:
 			dict = { 'compiled': {} }
 		if not hasKey:
 			dict['compiled'][host] = [ host ]
-			stream = file(os.path.join(self.pathCompiled, 
+			stream = open(os.path.join(self.pathCompiled, 
 						'top.sls'), 'w')
 			yaml.dump(dict, stream)
 		
@@ -256,8 +254,8 @@ class Plugin(stack.commands.Plugin):
 						parser  = make_parser()
 						handler = FileHandler(host_attrs)
 						parser.setContentHandler(handler)
-						parser.feed(handler.getXMLHeader())
-						parser.feed('<salt>')
+#						parser.feed(handler.getXMLHeader())
+						parser.feed('<stack:salt>')
 						fin = open(file.getFullName(), 'r')
 
 						# Parse as XML-ish to pickup the
@@ -276,9 +274,8 @@ class Plugin(stack.commands.Plugin):
 						# the reverse is not true (yet).
 
 						for line in fin.readlines():
-
-							if line.find('<file') == 0 or \
-								line.find('</file>') == 0:
+							if line.find('<stack:file') == 0 or \
+								line.find('</stack:file>') == 0:
 								s = line
 							else:
 								s = ''
@@ -296,9 +293,8 @@ class Plugin(stack.commands.Plugin):
 								parser.feed(s)
 							except:
 								print('Parsing Error file %s line %s' % (file.getFullName(), line))
-						parser.feed('</salt>')
+						parser.feed('</stack:salt>')
 						fin.close()
-
 						for parsed in handler.getFiles():
-							if stack.cond.EvalCondExpr(parsed.get('cond'), host_attrs):
+							if stack.cond.EvalCondExpr(parsed.get('stack:cond'), host_attrs):
 								self.writeSalt(host, parsed)
