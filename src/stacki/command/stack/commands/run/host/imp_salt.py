@@ -67,13 +67,12 @@ class Implementation(stack.commands.Implementation):
 			if host not in result.keys():
 				result[host] = False
 		host_output = {}
-		for host, status in result.items():
-			if status == True:
+		for host in result.keys():
+			if result[host] == False:
+				host_output[host] = 'Down'
+			else:
 				host_output[host] = result[host]
 
-		if bool(host_output) == False:
-			raise CommandError('', 'No hosts up.')
-			
 		for host in hosts:
 			if collate:
 				out = host_output[host].split('\n')
