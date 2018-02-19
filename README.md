@@ -15,7 +15,7 @@ By default, the "stack run host" command uses SSH as it's transportation backend
 
 Download the stacki-salt pallet for Stacki 5.0 to your frontend.
 
-[stacki-salt-5.0_2017.7.3_3cf9991-redhat7.x86_64.disk1.iso](http://http://teradata-stacki.s3.amazonaws.com/release/stacki/5.x/stacki-salt-5.0_2017.7.3_3cf9991-redhat7.x86_64.disk1.iso) 
+[stacki-salt-5.0_2017.7.3_3cf9991-redhat7.x86_64.disk1.iso](http://teradata-stacki.s3.amazonaws.com/release/stacki/5.x/stacki-salt-5.0_2017.7.3_3cf9991-redhat7.x86_64.disk1.iso) 
 md5sum: 4b3fd03132f6676b73c8cd943f2a7c4b
 
 ```
